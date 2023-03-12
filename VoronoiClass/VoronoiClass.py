@@ -10,6 +10,7 @@ import pickle
 import pandas as pd
 
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 from ortools.linear_solver import pywraplp
 from ortools.init import pywrapinit
@@ -171,9 +172,11 @@ class VoronoiMap:
         load the waypoints that the agents are to pass through
         """
 
+        self.waypoints_filename = waypoints_filename
+
         with open(waypoints_filename, 'r') as f:
             df = pd.read_csv(f, delimiter=',', )
-
+        
         self.towns_x = df.iloc[:, 0].to_numpy()
         self.towns_x = np.insert(self.towns_x, 0, start_x) * self.scale
 
@@ -206,8 +209,8 @@ class VoronoiMap:
         """
 
         from os.path import exists
-
-        file_exists = exists('distance_matrix_self.csv')
+        filename = 'distance_matrix_' + self.waypoints_filename.split('.')[0] + '.csv'
+        file_exists = exists(filename)
 
         if not file_exists:
             create_dist_start = time.time()
@@ -231,11 +234,11 @@ class VoronoiMap:
             distance_matrix = np.round_(distance_matrix).astype(int)
             print(distance_matrix)
 
-            np.savetxt("distance_matrix_self.csv", distance_matrix)
+            np.savetxt(filename, distance_matrix)
             print(time.time() - create_dist_start, 'seconds to create data matrix')
         else:
             print('Existing distance matrix file found')
-            with open('distance_matrix_self.csv') as f:
+            with open(filename) as f:
                 distance_matrix = np.genfromtxt(f, delimiter=' ')
                 distance_matrix = np.round_(distance_matrix).astype(int)
 
@@ -453,3 +456,72 @@ class VoronoiMap:
             self.plot()
 
         return self.routes, self.route_distances
+
+    def plot_animation(self):
+
+        width = int(self.img_original.shape[1] * self.scale)
+        height = int(self.img_original.shape[0] * self.scale)
+        dim = (width, height)
+        scaled_img_original = cv2.resize(self.img_original, dim, interpolation=cv2.INTER_AREA)
+
+        # plt.plot(self.towns_x[self.starting_town], self.towns_y[self.starting_town], 'o', markerfacecolor='w',  ms=10, alpha=1, color='black') #indicate start position with X
+        # plt.text(self.towns_x[self.starting_town]+10, self.towns_y[self.starting_town]+10, 'Start/Dropoff Point', fontsize=10, weight='bold') #indicate start position with X
+
+        # plt.imshow(scaled_img_original)
+
+        colour_code = 0
+        colours = ['blue', 'red', 'green', 'orange', 'purple']
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+
+        paths_x = []
+        paths_y = []
+
+        for route in self.routes:
+
+            path_x, path_y = [], []
+
+            route.append(self.starting_town)
+            for i in range(len(route)-1):
+                # print(route)
+                shortest_path = nx.shortest_path(self.G, tuple(self.towns_nodes[route[i]]), tuple(self.towns_nodes[route[i+1]]))
+                for j in range(len(shortest_path)):
+                    path_x.append(shortest_path[j][0])
+                    path_y.append(shortest_path[j][1])
+
+            paths_x.append(path_x)
+            paths_y.append(path_y)
+
+        ax.imshow(scaled_img_original)
+        ax.plot(self.towns_x[self.starting_town], self.towns_y[self.starting_town], 'o', markerfacecolor='w',  ms=8, alpha=1, color='black') #indicate start position with X
+        ax.text(self.towns_x[self.starting_town]+5, self.towns_y[self.starting_town]-10, 'Start/Dropoff Point', fontsize=10, weight='bold') #indicate start position with X
+        ax.axis('off')
+
+        colour_code = 0
+        for route in self.routes:
+            colour = colours[colour_code]
+            route.append(self.starting_town)
+            ax.plot(self.towns_x[route], self.towns_y[route], 'o', ms=5, alpha=0.5, c=colour)
+            colour_code += 1
+
+        line1, = ax.plot(paths_x[0], paths_y[0], colours[0], alpha=0.7)
+        line2, = ax.plot(paths_x[1], paths_y[1], colours[1], alpha=0.5)
+        line3, = ax.plot(paths_x[2], paths_y[2], colours[2], alpha=0.5)
+        # line4, = ax.plot(paths_x[3], paths_y[3], colours[3], alpha=0.5)
+        
+
+        def updateline(num, paths_x, paths_y, line1, line2, line3):
+            # print(data[0][..., :num])
+            line1.set_data(paths_x[0][:num], paths_y[0][:num])
+            line2.set_data(paths_x[1][:num], paths_y[1][:num])
+            line3.set_data(paths_x[2][:num], paths_y[2][:num])
+            # line4.set_data(paths_x[3][:num], paths_y[3][:num])
+            
+            return line1, line2, line3
+        
+        line_animation = animation.FuncAnimation(
+        fig, updateline, interval=10, fargs=(paths_x, paths_y, line1, line2, line3), blit=True, repeat=True)
+
+        line_animation.save('test.gif')
+        plt.show()
