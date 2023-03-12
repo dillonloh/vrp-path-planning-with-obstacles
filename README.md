@@ -1,5 +1,4 @@
-"# vrp-path-planning-with-obstacles" 
-
+Solves VRP and finds shortest path around waypoints even in presence of obstacles (walls/shelves/equipment etc.)
 Hi! Thanks for checking this repo out. 
 
 To test out the solver, try running the main.py file!
