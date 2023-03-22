@@ -64,7 +64,7 @@ networkx==2.8.4
 notebook==6.4.12
 numba==0.55.1
 numexpr==2.8.3
-numpy==1.21.5
+numpy
 opencv-python==4.7.0.68
 optapy==8.31.1b0
 ortools==9.4.1874
